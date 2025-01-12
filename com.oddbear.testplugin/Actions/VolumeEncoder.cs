@@ -71,15 +71,7 @@ public class VolumeEncoder : EncoderBase, IKeypadPlugin
     private bool _isEncoder;
     private PluginSettings _settings;
 
-    private static Dictionary<(DeviceOut, VolumeActionType), float> _mock = new ()
-    {
-        [(DeviceOut.MainOut, VolumeActionType.Set)] = -20f,
-        [(DeviceOut.MainOut, VolumeActionType.Adjust)] = -10f,
-        [(DeviceOut.Phones, VolumeActionType.Set)] = -30f,
-        [(DeviceOut.Phones, VolumeActionType.Adjust)] = +10f,
-        [(DeviceOut.Blend, VolumeActionType.Set)] = 0.5f,
-        [(DeviceOut.Blend, VolumeActionType.Adjust)] = -0.2f,
-    };
+    private static VolumeMock _volumeMock = new();
 
     public VolumeEncoder(ISDConnection connection, InitialPayload payload)
         : base(connection, payload)
@@ -94,16 +86,94 @@ public class VolumeEncoder : EncoderBase, IKeypadPlugin
         {
             _settings = payload.Settings.ToObject<PluginSettings>()!;
         }
-    }
-    
-    public void KeyPressed(KeyPayload payload)
-    {
-        //_settings
+
+        _volumeMock.PropertyChanged += VolumeMockOnPropertyChanged;
     }
 
-    public override void DialDown(DialPayload payload)
+    public override void Dispose()
     {
-        //_settings
+        _volumeMock.PropertyChanged -= VolumeMockOnPropertyChanged;
+    }
+
+    private void VolumeMockOnPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        // We also refresh the state when we get back the real value:
+        RefreshState();
+    }
+
+    public void KeyPressed(KeyPayload payload)
+    {
+        if (_settings.Output == DeviceOut.Blend)
+        {
+            if (_settings.ActionBlend == VolumeActionType.Set)
+            {
+                if (_settings.SetBlend is not float blend)
+                    return;
+
+                if (blend < -1)
+                    blend = -1;
+
+                if (blend > 1)
+                    blend = 1;
+
+                SetValue(blend);
+            }
+            else
+            {
+                var blend = GetValue();
+                if (_settings.AdjustBlend is not float adjustmentBlend)
+                    return;
+
+                blend += adjustmentBlend;
+                if (blend < -1)
+                    blend = -1;
+
+                if (blend > 1)
+                    blend = 1;
+
+                SetValue(blend);
+            }
+        }
+        else
+        {
+            if (_settings.ActionVolume == VolumeActionType.Set)
+            {
+                // TODO: Before we actually set a value on the slider, this one is null.
+                // TODO: It would be nice if we had a default, but the default is different based on the output and controller type.
+                if (_settings.SetVolume is not int volumeDb)
+                    return;
+
+                if (volumeDb < -96)
+                    volumeDb = -96;
+
+                if (volumeDb > 0)
+                    volumeDb = 0;
+
+                var volume = LookupTable.OutputDbToPercentage(volumeDb) * 100f;
+                SetValue(volume);
+            }
+            else
+            {
+                if (_settings.AdjustVolume is not int adjustmentDb)
+                    return;
+
+                var oldVolume = GetValue() / 100f;
+                var oldVolumeDb = LookupTable.OutputPercentageToDb(oldVolume);
+
+                var newVolumeDb = oldVolumeDb + adjustmentDb;
+                if (newVolumeDb < -96)
+                    newVolumeDb = -96;
+
+                if (newVolumeDb > 0)
+                    newVolumeDb = 0;
+
+                var newVolume = LookupTable.OutputDbToPercentage(newVolumeDb) * 100f;
+                SetValue(newVolume);
+            }
+        }
+
+        // We need to refresh the state with the cached value:
+        RefreshState();
     }
 
     public override void DialRotate(DialRotatePayload payload)
@@ -112,31 +182,38 @@ public class VolumeEncoder : EncoderBase, IKeypadPlugin
 
         if (_settings.Output == DeviceOut.Blend)
         {
-            if (_settings.AdjustBlend is not int steps)
+            if (_settings.AdjustBlend is not float steps)
                 return;
 
-            var oldBlend = _mock[(_settings.Output, VolumeActionType.Adjust)];
+            var oldBlend = GetValue() * 100;
 
             var newBlend = oldBlend + steps * ticks;
-            if (newBlend is < -1 or > +1)
-                return;
+            if (newBlend < -1)
+                newBlend = -1;
 
-            _mock[(_settings.Output, VolumeActionType.Adjust)] = newBlend;
+            if (newBlend > 1)
+                newBlend = 1;
+
+            SetValue(newBlend / 100);
         }
         else
         {
             if (_settings.AdjustVolume is not int steps)
                 return;
 
-            var oldVolume = _mock[(_settings.Output, VolumeActionType.Adjust)];
-            var newVolume = oldVolume + steps * ticks;
-            if (newVolume is < -96 or > 0)
-                return;
+            var oldVolume = GetValue() / 100f;
+            var oldValueDb = LookupTable.OutputPercentageToDb(oldVolume);
+            var newVolumeDb = oldValueDb + steps * ticks;
 
-            _mock[(_settings.Output, VolumeActionType.Adjust)] = newVolume;
+            if (newVolumeDb < -96)
+                newVolumeDb = -96;
+
+            if (newVolumeDb > 0)
+                newVolumeDb = 0;
+
+            var newVolume = LookupTable.OutputDbToPercentage(newVolumeDb) * 100;
+            SetValue(newVolume);
         }
-
-        RefreshState();
     }
 
     public override void ReceivedSettings(ReceivedSettingsPayload payload)
@@ -148,7 +225,7 @@ public class VolumeEncoder : EncoderBase, IKeypadPlugin
 
     private void RefreshState()
     {
-        VolumeActionType GetAction()
+        VolumeActionType? GetAction()
         {
             if (_isEncoder)
                 return VolumeActionType.Adjust;
@@ -159,20 +236,15 @@ public class VolumeEncoder : EncoderBase, IKeypadPlugin
         }
 
         var output = _settings.Output;
-        var action = GetAction();
-
-        //var action = _isEncoder
-        //    ? VolumeActionType.Adjust
-        //    : output == DeviceOut.Blend
-        //        ? _settings.AdjustBlend
-        //        : _settings.AdjustVolume;
+        if (GetAction() is not VolumeActionType action)
+            return;
 
         if (_settings.Output == DeviceOut.Blend)
         {
             float OutputBlendToPercentage(float valueBlend)
                 => (valueBlend + 1) * 50;
 
-            var blend = _mock[(output, action)];
+            var blend = GetValue();
             var percentage = OutputBlendToPercentage(blend);
 
             Connection.SetFeedbackAsync(new Dictionary<string, string>
@@ -184,11 +256,11 @@ public class VolumeEncoder : EncoderBase, IKeypadPlugin
         else
         {
             // -96 dB to 0 dB
-            float OutputDbToPercentage(float valueDb)
-                => (valueDb + 96f) / 96f * 100;
+            //float OutputDbToPercentage(float valueDb)
+            //    => (valueDb + 96f) / 96f * 100;
 
-            var volume = _mock[(output, action)];
-            var percentage = OutputDbToPercentage(volume);
+            var percentage = GetValue();
+            var volume = LookupTable.OutputPercentageToDb(percentage / 100f);
 
             Connection.SetFeedbackAsync(new Dictionary<string, string>
             {
@@ -198,9 +270,39 @@ public class VolumeEncoder : EncoderBase, IKeypadPlugin
         }
     }
 
+    void SetValue(float value)
+    {
+        switch (_settings.Output)
+        {
+            case DeviceOut.Blend:
+                _volumeMock.MonitorBlend = value;
+                break;
+            case DeviceOut.Phones:
+                _volumeMock.HeadphonesVolume = value;
+                break;
+            case DeviceOut.MainOut:
+                _volumeMock.MainOutVolume = value;
+                break;
+        }
+    }
+
+    float GetValue()
+    {
+        switch (_settings.Output)
+        {
+            case DeviceOut.Blend:
+                return _volumeMock.MonitorBlend;
+            case DeviceOut.Phones:
+                return _volumeMock.HeadphonesVolume;
+            case DeviceOut.MainOut:
+            default:
+                return _volumeMock.MainOutVolume;
+        }
+    }
+
     #region NotUsed
 
-    public override void Dispose()
+    public override void DialDown(DialPayload payload)
     {
         //
     }
