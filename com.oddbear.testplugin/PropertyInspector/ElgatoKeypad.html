@@ -1,0 +1,37 @@
+﻿<!DOCTYPE html>
+
+<html>
+<head>
+    <meta charset="utf-8" />
+
+    <script src="https://sdpi-components.dev/releases/v3/sdpi-components.js"></script>
+</head>
+<body>
+
+    <sdpi-item label="Name">
+        <sdpi-textfield setting="name"></sdpi-textfield>
+    </sdpi-item>
+
+    <sdpi-item label="Show Name">
+        <sdpi-checkbox setting="show_name"></sdpi-checkbox>
+    </sdpi-item>
+
+    <sdpi-item label="Favorite Color">
+        <sdpi-select setting="fav_color" placeholder="Please choose a color">
+            <option value="red">Red</option>
+            <option value="green">Green</option>
+            <option value="blue">Blue</option>
+        </sdpi-select>
+    </sdpi-item>
+
+    <sdpi-item label="Range">
+        <sdpi-range setting="brightness"
+                    min="0"
+                    max="100"
+                    step="5"
+                    showlabels>
+        </sdpi-range>
+    </sdpi-item>
+
+</body>
+</html>

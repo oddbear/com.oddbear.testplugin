@@ -1,0 +1,91 @@
+{
+  "$schema": "https://raw.githubusercontent.com/GeekyEggo/SharpDeck/master/src/SharpDeck.PropertyInspector/manifest-schema.json",
+  "Name": "Test Plugin",
+  "Version": "0.0.1",
+  "Author": "oddbear",
+  "UUID": "com.oddbear.testplugin",
+  "Actions": [
+    {
+      "Icon": "Images/Icons/category",
+      "Name": "Elgato Styling Test",
+      "PropertyInspectorPath": "PropertyInspector/ElgatoKeypad.html",
+      "States": [
+        {
+          "Image": "Images/Image"
+        }
+      ],
+      "UUID": "com.oddbear.testplugin.elgato-keypad"
+    },
+    {
+      "Icon": "Images/Icons/category",
+      "Name": "EasyPi Styling Test",
+      "PropertyInspectorPath": "PropertyInspector/EasyPiKeypad.html",
+      "States": [
+        {
+          "Image": "Images/Image"
+        }
+      ],
+      "UUID": "com.oddbear.testplugin.easypi-keypad"
+    },
+    {
+      "Icon": "Images/Icons/category",
+      "Name": "Encoder Test",
+      "PropertyInspectorPath": "PropertyInspector/TestEncoder.html",
+      "Controllers": [ "Encoder", "Keypad" ],
+      "Encoder": {
+        "layout": "$B1"
+      },
+      "States": [
+        {
+          "Image": "Images/Image",
+          "Title": "State 1"
+        },
+        {
+          "Image": "Images/Image",
+          "Title": "State 2"
+        }
+      ],
+      "UUID": "com.oddbear.testplugin.test-encoder"
+    },
+    {
+      "Icon": "Images/Icons/category",
+      "Name": "Encoder Volume",
+      "PropertyInspectorPath": "PropertyInspector/VolumeEncoder.html",
+      "Controllers": [ "Encoder", "Keypad" ],
+      "Encoder": {
+        "layout": "$B1"
+      },
+      "States": [
+        {
+          "Image": "Images/Image",
+          "Title": "Unmuted"
+        },
+        {
+          "Image": "Images/Image",
+          "Title": "Muted"
+        }
+      ],
+      "UUID": "com.oddbear.testplugin.volume-encoder"
+    }
+  ],
+  "Category": "Test Category",
+  "CategoryIcon": "Images/Icon",
+  "CodePath": "com.oddbear.testplugin.exe",
+  "CodePathMac": "com.oddbear.testplugin",
+  "Description": "Test Plugin the Stream Deck",
+  "Icon": "Images/Icon",
+  "SDKVersion": 2,
+  "Software": {
+    "MinimumVersion": "6.4"
+  },
+  "OS": [
+    {
+      "MinimumVersion": "10.11",
+      "Platform": "mac"
+    },
+    {
+      "MinimumVersion": "10",
+      "Platform": "windows"
+    }
+  ]
+}

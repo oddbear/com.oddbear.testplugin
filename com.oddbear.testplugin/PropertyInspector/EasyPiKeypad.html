@@ -1,0 +1,59 @@
+﻿<!DOCTYPE html>
+
+<html>
+<head>
+    <meta charset="utf-8" />
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/barraider/streamdeck-easypi-v2@latest/src/sdpi.css">
+    <script src="https://cdn.jsdelivr.net/gh/barraider/streamdeck-easypi-v2@latest/src/sdtools.common.js"></script>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/barraider/streamdeck-easypi-v2@latest/src/rangeTooltip.css">
+    <script src="https://cdn.jsdelivr.net/gh/barraider/streamdeck-easypi-v2@latest/src/rangeTooltip.js"></script>
+</head>
+<body>
+
+    <div class="sdpi-item">
+        <div class="sdpi-item-label">Name</div>
+        <div class="sdpi-item-value">
+            <input id="name" class="sdProperty" oninput="setSettings()">
+        </div>
+    </div>
+
+    <div class="sdpi-item">
+        <div class="sdpi-item-label">Show Name</div>
+        <div class="sdpi-item-value">
+            <!-- Always hidden? -->
+            <input id="show_name" type="checkbox" class="sdProperty sdCheckbox" oninput="setSettings()">
+        </div>
+    </div>
+
+    <div class="sdpi-item">
+        <div class="sdpi-item-label">Favorite Color</div>
+        <div class="sdpi-item-value">
+            <select id="fav_color" class="sdProperty" onchange="setSettings()">
+                <!--<option value="" disabled selected>Please choose a color</option>-->
+                <option value="red">Red</option>
+                <option value="green">Green</option>
+                <option value="blue">Blue</option>
+            </select>
+        </div>
+    </div>
+
+    <div type="range" class="sdpi-item sdShowTooltip">
+        <div class="sdpi-item-label" id="speedLabel">Range</div>
+        <div class="sdpi-item-value">
+            <span class="clickable" value="1">1</span>
+            <input id="brightness" type="range" min="0" max="100" step="5" list="numbers" data-suffix=" %" class="sdProperty" oninput="setSettings()">
+            <span class="clickable" value="200">200</span>
+            <!-- What does this one do? -->
+            <datalist id="numbers">
+                <option>100</option>
+            </datalist>
+            <!-- Seems broken -->
+            <label for="brightness" class="rangeLabel"></label>
+        </div>
+    </div>
+
+    <div class="sdpi-info-label hidden" style="top: -1000;" value="">Tooltip</div>
+</body>
+</html>
