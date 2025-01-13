@@ -1,4 +1,10 @@
-﻿function setSdpiSettingVisibility(setting, isVisible) {
+﻿
+/**
+ * Get all the settings from the Property Inspector, and set the visibility of the settings.
+ * @param {string} setting
+ * @param {bool} isVisible
+ */
+function setSdpiSettingVisibility(setting, isVisible) {
     const elements = document.querySelectorAll(`[setting="${setting}"]`);
     elements.forEach(element => {
         // Element should be a spdi-item: TODO: Is this needed, or could I just say any element?
@@ -12,6 +18,32 @@
     });
 }
 
+/**
+ * Set enable or disable on the true HTML elements of the Sdpi-Elements.
+ * @param {string} setting
+ * @param {boolean} enable
+ */
+function setSdpiSettingEnabled(setting, enable) {
+    const elements = document.querySelectorAll(`[setting="${setting}"]`);
+    elements.forEach(element => {
+        switch (element.tagName.toLowerCase()) {
+            case "sdpi-select":
+                element.shadowRoot.querySelector('select').disabled = !enable;
+                break;
+            case "sdpi-range":
+                element.shadowRoot.querySelector('input[type="range"]').disabled = !enable;
+                break
+        }
+    });
+}
+
+/**
+ * Update the layout for the Range slider element.
+ * @param {string} setting
+ * @param {string|number} min
+ * @param {string|number} max
+ * @param {number} step
+ */
 function updateSdpiRange(setting, min, max, step) {
     const sdpiRange = document.querySelector(`sdpi-range[setting="${setting}"]`);
     if (sdpiRange) {
@@ -52,6 +84,11 @@ function updateSdpiRange(setting, min, max, step) {
     }
 }
 
+/**
+ * Converts a string to a number or returns the number if it is already a number.
+ * @param {string|number} numString
+ * @returns number
+ */
 function parseNumber(numString) {
     // No parsing needed:
     if (typeof numString === "number") {
@@ -67,7 +104,12 @@ function parseNumber(numString) {
     return parseInt(strValueClean);
 }
 
+/**
+ * Just adds datatime after the string.
+ * @param {string} str
+ * @returns string
+ */
 function entryString(str) {
     const dateTime = new Date(Date.now());
-    return `${str}: ${dateTime.toISOString()}`;
+    return `${dateTime.toISOString()}: ${str}`;
 }

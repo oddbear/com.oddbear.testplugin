@@ -1,4 +1,6 @@
-﻿document.addEventListener('DOMContentLoaded', async function () {
+﻿/// <reference path="common.js" />
+
+document.addEventListener('DOMContentLoaded', async function () {
     const { streamDeckClient } = SDPIComponents;
 
     const testDiv = document.getElementById("testDiv");

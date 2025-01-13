@@ -1,10 +1,28 @@
-﻿document.addEventListener('DOMContentLoaded', async function () {
+﻿/// <reference path="common.js" />
+
+document.addEventListener('DOMContentLoaded', async function () {
     const { streamDeckClient } = SDPIComponents;
 
     const infoResult = await streamDeckClient.getConnectionInfo();
     const controller = infoResult.actionInfo.payload.controller;
     const isEncoder = controller === "Encoder";
     const isKeypad = controller === "Keypad";
+
+    const settingsLog = document.querySelector('#settingsLog');
+
+    // When receiving settings FROM plugin SetSettingsAsync:
+    streamDeckClient.didReceiveSettings.subscribe((actionInfo) => {
+        const settingsJson = JSON.stringify(actionInfo.payload.settings);
+        settingsLog.textContent = entryString(settingsJson);
+    });
+
+    // When receiving settings on init:
+    const settings = infoResult.actionInfo.payload.settings;
+    if (settings) {
+        settingsLog.textContent = `Init: ${JSON.stringify(settings)}`;
+        // Will trigger ReceivedSettings in cs plugin:
+        //await streamDeckClient.setSettings(settings);
+    }
 
     // SDPI Select Elements:
     const sdpi_select_output = document.querySelector('sdpi-select[setting="output"]');

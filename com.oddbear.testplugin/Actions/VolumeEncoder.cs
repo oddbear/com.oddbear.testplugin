@@ -2,11 +2,9 @@
 using BarRaider.SdTools.Payloads;
 using Newtonsoft.Json;
 using System.ComponentModel;
-using System.Runtime.Serialization;
 using Newtonsoft.Json.Converters;
 using System.Globalization;
-using System.Drawing.Drawing2D;
-using Newtonsoft.Json.Linq;
+using com.oddbear.testplugin.Actions.Enums;
 
 namespace com.oddbear.testplugin.Actions;
 
@@ -15,57 +13,25 @@ public class VolumeEncoder : EncoderBase, IKeypadPlugin
 {
     protected class PluginSettings
     {
-        public static PluginSettings CreateDefaultSettings()
-        {
-            return new PluginSettings
-            {
-                //
-            };
-        }
-
         [JsonConverter(typeof(StringEnumConverter))]
         [JsonProperty(PropertyName = "output")]
         public DeviceOut Output { get; set; }
 
         [JsonConverter(typeof(StringEnumConverter))]
-        [JsonProperty(PropertyName = "volume-action")]
-        public VolumeActionType? ActionVolume { get; set; }
+        [JsonProperty(PropertyName = "action")]
+        public VolumeActionType Action { get; set; }
 
         [JsonProperty(PropertyName = "volume-set")]
-        public int? SetVolume { get; set; }
+        public int SetVolume { get; set; }
 
         [JsonProperty(PropertyName = "volume-adjust")]
-        public int? AdjustVolume { get; set; }
-
-        [JsonConverter(typeof(StringEnumConverter))]
-        [JsonProperty(PropertyName = "blend-action")]
-        public VolumeActionType? ActionBlend { get; set; }
+        public int AdjustVolume { get; set; }
 
         [JsonProperty(PropertyName = "blend-set")]
-        public float? SetBlend { get; set; }
+        public float SetBlend { get; set; }
 
         [JsonProperty(PropertyName = "blend-adjust")]
-        public float? AdjustBlend { get; set; }
-    }
-
-    public enum DeviceOut
-    {
-        [Description("Main Out")]
-        MainOut,
-        [Description("Phones")]
-        Phones,
-        [Description("Blend")]
-        Blend
-    }
-
-    public enum VolumeActionType
-    {
-        [EnumMember(Value = "set")]
-        Set,
-        [EnumMember(Value = "adjust")]
-        Adjust,
-        [EnumMember(Value = "mute")]
-        Mute
+        public float AdjustBlend { get; set; }
     }
 
     private bool _isEncoder;
@@ -80,7 +46,7 @@ public class VolumeEncoder : EncoderBase, IKeypadPlugin
 
         if (payload.Settings == null || payload.Settings.Count == 0)
         {
-            _settings = PluginSettings.CreateDefaultSettings();
+            _settings = new PluginSettings();
         }
         else
         {
@@ -105,10 +71,9 @@ public class VolumeEncoder : EncoderBase, IKeypadPlugin
     {
         if (_settings.Output == DeviceOut.Blend)
         {
-            if (_settings.ActionBlend == VolumeActionType.Set)
+            if (_settings.Action == VolumeActionType.Set)
             {
-                if (_settings.SetBlend is not float blend)
-                    return;
+                var blend = _settings.SetBlend;
 
                 if (blend < -1)
                     blend = -1;
@@ -121,8 +86,7 @@ public class VolumeEncoder : EncoderBase, IKeypadPlugin
             else
             {
                 var blend = GetValue();
-                if (_settings.AdjustBlend is not float adjustmentBlend)
-                    return;
+                var adjustmentBlend = _settings.AdjustBlend;
 
                 blend += adjustmentBlend;
                 if (blend < -1)
@@ -136,12 +100,9 @@ public class VolumeEncoder : EncoderBase, IKeypadPlugin
         }
         else
         {
-            if (_settings.ActionVolume == VolumeActionType.Set)
+            if (_settings.Action == VolumeActionType.Set)
             {
-                // TODO: Before we actually set a value on the slider, this one is null.
-                // TODO: It would be nice if we had a default, but the default is different based on the output and controller type.
-                if (_settings.SetVolume is not int volumeDb)
-                    return;
+                var volumeDb = _settings.SetVolume;
 
                 if (volumeDb < -96)
                     volumeDb = -96;
@@ -154,8 +115,7 @@ public class VolumeEncoder : EncoderBase, IKeypadPlugin
             }
             else
             {
-                if (_settings.AdjustVolume is not int adjustmentDb)
-                    return;
+                var adjustmentDb = _settings.AdjustVolume;
 
                 var oldVolume = GetValue() / 100f;
                 var oldVolumeDb = LookupTable.OutputPercentageToDb(oldVolume);
@@ -182,8 +142,7 @@ public class VolumeEncoder : EncoderBase, IKeypadPlugin
 
         if (_settings.Output == DeviceOut.Blend)
         {
-            if (_settings.AdjustBlend is not float steps)
-                return;
+            var steps = _settings.AdjustBlend;
 
             var oldBlend = GetValue() * 100;
 
@@ -198,8 +157,7 @@ public class VolumeEncoder : EncoderBase, IKeypadPlugin
         }
         else
         {
-            if (_settings.AdjustVolume is not int steps)
-                return;
+            var steps = _settings.AdjustVolume;
 
             var oldVolume = GetValue() / 100f;
             var oldValueDb = LookupTable.OutputPercentageToDb(oldVolume);
@@ -225,20 +183,6 @@ public class VolumeEncoder : EncoderBase, IKeypadPlugin
 
     private void RefreshState()
     {
-        VolumeActionType? GetAction()
-        {
-            if (_isEncoder)
-                return VolumeActionType.Adjust;
-
-            return _settings.Output == DeviceOut.Blend
-                ? _settings.ActionBlend
-                : _settings.ActionVolume;
-        }
-
-        var output = _settings.Output;
-        if (GetAction() is not VolumeActionType action)
-            return;
-
         if (_settings.Output == DeviceOut.Blend)
         {
             float OutputBlendToPercentage(float valueBlend)
@@ -329,7 +273,7 @@ public class VolumeEncoder : EncoderBase, IKeypadPlugin
 
     public override void OnTick()
     {
-        //
+        //Connection.SetSettingsAsync(JObject.FromObject(_settings));
     }
 
     #endregion
