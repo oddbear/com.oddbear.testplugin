@@ -51,6 +51,8 @@ function updateSdpiRange(setting, min, max, step, defaultValue) {
 
         // Set a defaultValue as the default, if nothing is already set:
         if (!sdpiRange.value && typeof defaultValue === 'number') {
+            // I think there is some issue here, might need to also set the defaultValue on the input range.
+            // Only happens in some scenarios though, and might be an issue that we set it on update on not init.
             sdpiRange.value = defaultValue;
         }
 

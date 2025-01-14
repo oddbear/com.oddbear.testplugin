@@ -1,0 +1,82 @@
+﻿<!DOCTYPE html>
+
+<html>
+<head>
+    <meta charset="utf-8" />
+
+    <script src="https://sdpi-components.dev/releases/v3/sdpi-components.js"></script>
+</head>
+<body>
+    <sdpi-item label="Output">
+        <sdpi-select setting="output"
+                     placeholder="Please choose an Output">
+            <option value="mainOut">Main Out</option>
+            <option value="phones">Headphones</option>
+            <option value="blend">Blend</option>
+        </sdpi-select>
+    </sdpi-item>
+
+    <sdpi-item label="Action" style="display:none;">
+        <sdpi-select setting="action"
+                     placeholder="Please choose an Action">
+            <option value="set">Set Value</option>
+            <option value="adjust">Adjust Value</option>
+        </sdpi-select>
+    </sdpi-item>
+
+    <!-- We use 4 states, as these have different min/max values -->
+    <sdpi-item label="Volume (dB)" style="display:none;">
+        <sdpi-range setting="volume-set"
+                    min="-96"
+                    max="0"
+                    step="1"
+                    default="-10"
+                    showlabels>
+            <span slot="min">-96</span>
+            <span slot="max">0</span>
+        </sdpi-range>
+    </sdpi-item>
+
+    <sdpi-item label="Step Size (dB)" style="display:none;">
+        <sdpi-range setting="volume-adjust"
+                    min="-25"
+                    max="25"
+                    step="1"
+                    default="0"
+                    showlabels>
+            <span slot="min">-25</span>
+            <span slot="max">25</span>
+        </sdpi-range>
+    </sdpi-item>
+
+    <sdpi-item label="Blend" style="display:none;">
+        <sdpi-range setting="blend-set"
+                    min="-1"
+                    max="1"
+                    step="0.1"
+                    default="0"
+                    showlabels>
+            <span slot="min">-1</span>
+            <span slot="max">1</span>
+        </sdpi-range>
+    </sdpi-item>
+
+    <sdpi-item label="Step Size" style="display:none;">
+        <sdpi-range setting="blend-adjust"
+                    min="-1"
+                    max="1"
+                    step="0.1"
+                    default="0"
+                    showlabels>
+            <span slot="min">-1</span>
+            <span slot="max">1</span>
+        </sdpi-range>
+    </sdpi-item>
+
+    <div id="settingsLog" style="color:white;">no settings received from plugin</div>
+
+    <!-- JavaScript in this file -->
+    <script src="Common.js"></script>
+    <script src="VolumeEncoderUC.js"></script>
+</body>
+</html>

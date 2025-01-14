@@ -66,6 +66,26 @@
         }
       ],
       "UUID": "com.oddbear.testplugin.volume-encoder"
+    },
+    {
+      "Icon": "Images/Icons/category",
+      "Name": "Encoder Volume UC",
+      "PropertyInspectorPath": "PropertyInspector/VolumeEncoderUC.html",
+      "Controllers": [ "Encoder", "Keypad" ],
+      "Encoder": {
+        "layout": "$B1"
+      },
+      "States": [
+        {
+          "Image": "Images/Image",
+          "Title": "Unmuted"
+        },
+        {
+          "Image": "Images/Image",
+          "Title": "Muted"
+        }
+      ],
+      "UUID": "com.oddbear.testplugin.volume-encoder-uc"
     }
   ],
   "Category": "Test Category",

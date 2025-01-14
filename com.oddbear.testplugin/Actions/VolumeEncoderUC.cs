@@ -3,15 +3,14 @@ using BarRaider.SdTools.Payloads;
 using Newtonsoft.Json;
 using System.ComponentModel;
 using Newtonsoft.Json.Converters;
-using System.Globalization;
 using com.oddbear.testplugin.Actions.Enums;
-using System.Drawing.Drawing2D;
 using Newtonsoft.Json.Linq;
 
 namespace com.oddbear.testplugin.Actions;
 
-[PluginActionId("com.oddbear.testplugin.volume-encoder")]
-public class VolumeEncoder : EncoderBase, IKeypadPlugin
+// To try to just mimic the feel of the interface dial as much as possible:
+[PluginActionId("com.oddbear.testplugin.volume-encoder-uc")]
+public class VolumeEncoderUc : EncoderBase, IKeypadPlugin
 {
     protected class PluginSettings
     {
@@ -42,7 +41,7 @@ public class VolumeEncoder : EncoderBase, IKeypadPlugin
 
     private static VolumeCache _volumeCache = new();
 
-    public VolumeEncoder(ISDConnection connection, InitialPayload payload)
+    public VolumeEncoderUc(ISDConnection connection, InitialPayload payload)
         : base(connection, payload)
     {
         _isEncoder = payload.Controller == "Encoder";
@@ -67,7 +66,8 @@ public class VolumeEncoder : EncoderBase, IKeypadPlugin
 
     private void VolumeCacheOnPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        // We also refresh the state when we get back the real value:
+        // Important use this event instead of calling RefreshState directly when changing state.
+        // If not the state will be updated locally and not globally.
         RefreshState();
     }
 
@@ -75,43 +75,16 @@ public class VolumeEncoder : EncoderBase, IKeypadPlugin
     {
         switch (_settings.Action)
         {
-            case VolumeActionType.Adjust:
-                Adjust(1);
-                break;
             case VolumeActionType.Set:
-                Set();
+                KeypadSet();
+                break;
+            case VolumeActionType.Adjust:
+                KeypadAdjust(1);
                 break;
         }
-
-        // We need to refresh the state with the cached value:
-        RefreshState();
     }
 
-    public override void DialRotate(DialRotatePayload payload)
-    {
-        Adjust(payload.Ticks);
-
-        // We need to refresh the state with the cached value:
-        RefreshState();
-    }
-
-    private void Adjust(int ticks)
-    {
-        switch (_settings.Output)
-        {
-            case DeviceOut.Blend:
-                _volumeCache.MonitorBlend = AdjustBlendCalc(_volumeCache.MonitorBlend, _settings.AdjustBlend, ticks);
-                return;
-            case DeviceOut.Phones:
-                _volumeCache.HeadphonesVolume = AdjustVolumeCalc(_volumeCache.HeadphonesVolume, _settings.AdjustVolume, ticks);
-                return;
-            case DeviceOut.MainOut:
-                _volumeCache.MainOutVolume = AdjustVolumeCalc(_volumeCache.MainOutVolume, _settings.AdjustVolume, ticks);
-                return;
-        }
-    }
-
-    private void Set()
+    private void KeypadSet()
     {
         switch (_settings.Output)
         {
@@ -124,6 +97,43 @@ public class VolumeEncoder : EncoderBase, IKeypadPlugin
             case DeviceOut.MainOut:
                 _volumeCache.MainOutVolume = SetVolumeCalc(_settings.SetVolume);
                 break;
+        }
+    }
+
+    private void KeypadAdjust(int ticks)
+    {
+        switch (_settings.Output)
+        {
+            case DeviceOut.Blend:
+                // I get about 30 ticks for the whole dial on the interface from -1 to +1
+                _volumeCache.MonitorBlend = AdjustBlendCalc(_volumeCache.MonitorBlend, _settings.AdjustBlend, ticks);
+                return;
+            case DeviceOut.Phones:
+                _volumeCache.HeadphonesVolume = AdjustVolumeDbCalc(_volumeCache.HeadphonesVolume, _settings.AdjustVolume, ticks);
+                return;
+            case DeviceOut.MainOut:
+                // 0 -> -0.06 -> -0.12
+                // -10 -> -9.52 -> -9.07
+                // -96 -> -91.9 -> -87.97 -> -84.21
+                _volumeCache.MainOutVolume = AdjustVolumeDbCalc(_volumeCache.MainOutVolume, _settings.AdjustVolume, ticks);
+                return;
+        }
+    }
+
+    public override void DialRotate(DialRotatePayload payload)
+    {
+        // We use fixed values, as these are the same as the ones in UC.
+        switch (_settings.Output)
+        {
+            case DeviceOut.Blend:
+                _volumeCache.MonitorBlend = AdjustBlendCalc(_volumeCache.MonitorBlend, 0.02f, payload.Ticks);
+                return;
+            case DeviceOut.Phones:
+                _volumeCache.HeadphonesVolume = AdjustVolumePercentageCalc(_volumeCache.HeadphonesVolume, 0.01f, payload.Ticks);
+                return;
+            case DeviceOut.MainOut:
+                _volumeCache.MainOutVolume = AdjustVolumePercentageCalc(_volumeCache.MainOutVolume, 0.01f, payload.Ticks);
+                return;
         }
     }
 
@@ -140,15 +150,35 @@ public class VolumeEncoder : EncoderBase, IKeypadPlugin
         return newVolumeRaw;
     }
 
-    private float AdjustVolumeCalc(float oldVolume, int value, int ticks)
+    private float AdjustVolumeDbCalc(float oldVolumeP, float value, int ticks)
+    {
+        var oldVolumeDb = LookupTable.OutputPercentageToDb(oldVolumeP);
+        var adjustment = value * ticks;
+
+        var newVolumeDb = oldVolumeDb + adjustment;
+
+        if (newVolumeDb < -96)
+            newVolumeDb = -96;
+
+        if (newVolumeDb > 0)
+            newVolumeDb = 0;
+
+        return LookupTable.OutputDbToPercentage(newVolumeDb);
+    }
+
+    private float AdjustVolumePercentageCalc(float oldVolume, float value, int ticks)
     {
         var adjustment = value * ticks;
 
-        var oldVolumeRaw = oldVolume;
-        var oldVolumeDb = LookupTable.OutputPercentageToDb(oldVolumeRaw);
-        var newVolumeDb = oldVolumeDb + adjustment;
+        var newVolume = oldVolume + adjustment;
 
-        return SetVolumeCalc(newVolumeDb);
+        if (newVolume < 0)
+            newVolume = 0;
+
+        if (newVolume > 1)
+            newVolume = 1;
+
+        return newVolume;
     }
 
     private static float SetBlendCalc(float newBlend)
@@ -171,9 +201,7 @@ public class VolumeEncoder : EncoderBase, IKeypadPlugin
 
     public override void ReceivedSettings(ReceivedSettingsPayload payload)
     {
-        // TODO: Might need to set on each update:
         Tools.AutoPopulateSettings(_settings, payload.Settings);
-        //Connection.SetSettingsAsync(JObject.FromObject(_settings));
         RefreshState();
     }
 
@@ -182,7 +210,7 @@ public class VolumeEncoder : EncoderBase, IKeypadPlugin
         switch (_settings.Output)
         {
             case DeviceOut.Blend:
-                RefreshBlend();
+                RefreshBlend(_volumeCache.MonitorBlend);
                 return;
             case DeviceOut.Phones:
                 RefreshVolume(_volumeCache.HeadphonesVolume);
@@ -193,10 +221,8 @@ public class VolumeEncoder : EncoderBase, IKeypadPlugin
         }
     }
 
-    private void RefreshBlend()
+    private void RefreshBlend(float blend)
     {
-        var blend = _volumeCache.MonitorBlend;
-
         if (_isEncoder)
         {
             float OutputBlendToPercentage(float valueBlend)
@@ -204,11 +230,11 @@ public class VolumeEncoder : EncoderBase, IKeypadPlugin
 
             var percentage = OutputBlendToPercentage(blend);
 
-            Connection.SetFeedbackAsync(new Dictionary<string, string>
+            Connection.SetFeedbackAsync(JObject.FromObject(new
             {
-                ["value"] = $"{blend:0.00}",
-                ["indicator"] = percentage.ToString(CultureInfo.InvariantCulture)
-            });
+                value = $"{blend:0.00}",
+                indicator = percentage
+            }));
         }
         else
         {
@@ -221,22 +247,17 @@ public class VolumeEncoder : EncoderBase, IKeypadPlugin
         var volumeDb = LookupTable.OutputPercentageToDb(percentage);
         if (_isEncoder)
         {
-            // -96 dB to 0 dB
-            float OutputDbToPercentage(float valueDb)
-                => (valueDb + 96f) / 96f * 100;
-
             var indicatorPercentage = percentage * 100f;
-            var indicatorPercentageDb = OutputDbToPercentage(volumeDb);
 
             Connection.SetFeedbackAsync(JObject.FromObject(new
             {
-                value = $"{volumeDb:0.0} dB",
+                value = $"{volumeDb:0.00} dB",
                 indicator = indicatorPercentage
             }));
         }
         else
         {
-            Connection.SetTitleAsync($"{volumeDb:0.0} dB");
+            Connection.SetTitleAsync($"{volumeDb:0.00} dB");
         }
     }
 
