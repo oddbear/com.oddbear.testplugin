@@ -26,45 +26,94 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     // SDPI Select Elements:
     const sdpi_select_output = document.querySelector('sdpi-select[setting="output"]');
-    const sdpi_select_action_volume = document.querySelector('sdpi-select[setting="volume-action"]');
-    const sdpi_select_action_blend = document.querySelector('sdpi-select[setting="blend-action"]');
+    const sdpi_select_action = document.querySelector('sdpi-select[setting="action"]');
 
     // HTML Select Elements:
     const select_output = sdpi_select_output.shadowRoot.querySelector('select');
-    const select_action_volume = sdpi_select_action_volume.shadowRoot.querySelector('select');
-    const select_action_blend = sdpi_select_action_blend.shadowRoot.querySelector('select');
+    const select_action = sdpi_select_action.shadowRoot.querySelector('select');
 
     // Adding changed events:
-    select_output.addEventListener('change', outputChanged);
-    select_action_volume.addEventListener('change', actionChanged);
-    select_action_blend.addEventListener('change', actionChanged);
+    select_output.addEventListener('change', changeEvent);
+    select_action.addEventListener('change', changeEvent);
 
-    // Might be refresh of PropertyInspector:
-    outputChanged();
-
-    function outputChanged() {
-        if (!hasOutputSelected()) {
-            // No Output, so no state:
-            return;
-        }
-
-        // We know we have a valid Output value here:
-        setActionVisibility();
-
-        // We know we have a valid State here:
-        setSdpiRangeValues();
-        setSdpiRangeVisibility();
+    // Set initial values:
+    // A encoder will never be a keypad, therefor we can do some assumptions:
+    if (isKeypad) {
+        // Keypad can adjust and set:
+        setSdpiSettingEnabled("action", true);
+    }
+    else {
+        // Encoder is always adjust:
+        select_action.value = "adjust";
     }
 
-    function actionChanged() {
-        if (!hasActionSelected()) {
-            // No Action, so no valid state:
+    // Trigger initial change event:
+    changeEvent();
+
+    function changeEvent() {
+        setSdpiRangeVisibility();
+        setSdpiRangeValues();
+    }
+
+    function setSdpiRangeVisibility() {
+        setSdpiSettingVisibility("volume-set", isVolumeOutput() && isSetAction());
+        setSdpiSettingVisibility("volume-adjust", isVolumeOutput() && isAdjustAction());
+        setSdpiSettingVisibility("blend-set", isBlendOutput() && isSetAction());
+        setSdpiSettingVisibility("blend-adjust", isBlendOutput() && isAdjustAction());
+    }
+
+    function setSdpiRangeValues() {
+        // How we set values is different for encoder and keypad,
+        // encoders are always possitive(cause negtive is turn left),
+        // and keypads can be negative.
+
+        // Keypad can adjust and set:
+        if (isKeypad) {
+
+            // Keypad Outputs Set:
+            if (isVolumeOutput() && isSetAction()) {
+                updateSdpiRange("volume-set", "-96 dB", "0 dB", 1, -10);
+                return;
+            }
+
+            // Keypad Outputs Adjust:
+            if (isVolumeOutput() && isAdjustAction()) {
+                updateSdpiRange("volume-adjust", "-25 dB", "25 dB", 1, 0);
+                return;
+            }
+
+            // Keypad Blend Set:
+            if (isBlendOutput() && isSetAction()) {
+                updateSdpiRange("blend-set", -1, 1, 0.1, 0);
+                return;
+            }
+
+            // Keypad Blend Adjust:
+            if (isBlendOutput() && isAdjustAction()) {
+                updateSdpiRange("blend-adjust", -0.2, 0.2, 0.1, 0);
+                return;
+            }
+
             return;
         }
 
-        // We know we have a valid State here:
-        setSdpiRangeValues();
-        setSdpiRangeVisibility();
+        // Encoder can only adjust:
+        if (isEncoder) {
+
+            // Encoder Outputs Adjust:
+            if (isVolumeOutput() && isAdjustAction()) {
+                updateSdpiRange("volume-adjust", "1 dB", "10 dB", 1, 2);
+                return;
+            }
+
+            // Encoder Blend Adjust:
+            if (isBlendOutput() && isAdjustAction()) {
+                updateSdpiRange("blend-adjust", 0.05, 0.2, 0.05, 0.1);
+                return;
+            }
+
+            return;
+        }
     }
 
     function hasOutputSelected() {
@@ -88,106 +137,11 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     function isSetAction() {
         // Encoder is always adjust:
-        if (isEncoder) {
-            return false;
-        }
-
-        if (isVolumeOutput()) {
-            return select_action_volume.value === "set";
-        }
-
-        if (isBlendOutput()) {
-            return select_action_blend.value === "set";
-        }
-
-        return false;
+        return isKeypad && select_action.value === "set";
     }
 
     function isAdjustAction() {
         // Encoder is always adjust:
-        if (isEncoder) {
-            return true;
-        }
-
-        if (isVolumeOutput()) {
-            return select_action_volume.value === "adjust";
-        }
-
-        if (isBlendOutput()) {
-            return select_action_blend.value === "adjust";
-        }
-
-        return false;
-    }
-
-    function setActionVisibility() {
-        if (isKeypad && isVolumeOutput()) {
-            setSdpiSettingVisibility("volume-action", true);
-            setSdpiSettingVisibility("blend-action", false);
-        }
-        else if (isKeypad && isBlendOutput()) {
-            setSdpiSettingVisibility("volume-action", false);
-            setSdpiSettingVisibility("blend-action", true);
-        }
-        else {
-            setSdpiSettingVisibility("volume-action", false);
-            setSdpiSettingVisibility("blend-action", false);
-        }
-    }
-
-    function setSdpiRangeVisibility() {
-        if (isVolumeOutput() && isSetAction()) {
-            setSdpiSettingVisibility("volume-set", true);
-            setSdpiSettingVisibility("volume-adjust", false);
-            setSdpiSettingVisibility("blend-set", false);
-            setSdpiSettingVisibility("blend-adjust", false);
-        }
-        else if (isVolumeOutput() && isAdjustAction()) {
-            setSdpiSettingVisibility("volume-set", false);
-            setSdpiSettingVisibility("volume-adjust", true);
-            setSdpiSettingVisibility("blend-set", false);
-            setSdpiSettingVisibility("blend-adjust", false);
-        }
-        else if (isBlendOutput() && isSetAction()) {
-            setSdpiSettingVisibility("volume-set", false);
-            setSdpiSettingVisibility("volume-adjust", false);
-            setSdpiSettingVisibility("blend-set", true);
-            setSdpiSettingVisibility("blend-adjust", false);
-        }
-        else if (isBlendOutput() && isAdjustAction()) {
-            setSdpiSettingVisibility("volume-set", false);
-            setSdpiSettingVisibility("volume-adjust", false);
-            setSdpiSettingVisibility("blend-set", false);
-            setSdpiSettingVisibility("blend-adjust", true);
-        }
-        else {
-            setSdpiSettingVisibility("volume-set", false);
-            setSdpiSettingVisibility("volume-adjust", false);
-            setSdpiSettingVisibility("blend-set", false);
-            setSdpiSettingVisibility("blend-adjust", false);
-        }
-    }
-
-    function setSdpiRangeValues() {
-        if (isEncoder && isVolumeOutput()) {
-            // Encoder Outputs Adjust:
-            updateSdpiRange("volume-adjust", "1 dB", "25 dB", 1);
-        }
-        else if (isEncoder && isBlendOutput()) {
-            // Encoder Blend Adjust:
-            updateSdpiRange("volume-adjust", "0.1", "0.2", 0.1);
-        }
-        else if (isKeypad && isVolumeOutput()) {
-            // Keypad Outputs Set:
-            updateSdpiRange("volume-set", "-96 dB", "0 dB", 1);
-            // Keypad Outputs Adjust:
-            updateSdpiRange("volume-adjust", "-25 dB", "25 dB", 1);
-        }
-        else if (isKeypad && isBlendOutput()) {
-            // Keypad Blend Set:
-            updateSdpiRange("volume-set", "-1", "1", 0.1);
-            // Keypad Blend Adjust:
-            updateSdpiRange("volume-adjust", "-0.2", "0.2", 0.1);
-        }
+        return isEncoder || select_action.value === "adjust";
     }
 });

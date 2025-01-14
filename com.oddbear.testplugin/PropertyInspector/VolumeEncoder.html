@@ -7,62 +7,56 @@
     <script src="https://sdpi-components.dev/releases/v3/sdpi-components.js"></script>
 </head>
 <body>
-    
-<div id="settingsLog" style="color:white;">no settings received from plugin</div>
 
-<sdpi-item label="Output">
-        <sdpi-select setting="output" placeholder="Please choose an Output">
+    <div id="settingsLog" style="color:white;">no settings received from plugin</div>
+
+    <sdpi-item label="Output">
+        <sdpi-select setting="output"
+                     placeholder="Please choose an Output">
             <option value="mainOut">Main Out</option>
             <option value="phones">Headphones</option>
             <option value="blend">Blend</option>
         </sdpi-select>
     </sdpi-item>
 
-    <!-- Outputs: -->
-    <sdpi-item label="Action" style="display:none;">
-        <sdpi-select setting="volume-action" placeholder="Please choose an Action">
-            <option value="set">Set Output Volume (dB)</option>
-            <option value="adjust">Adjust Output Volume (dB)</option>
+    <sdpi-item label="Action">
+        <sdpi-select setting="action"
+                     placeholder="Please choose an Action"
+                     disabled>
+            <option value="set">Set Value</option>
+            <option value="adjust">Adjust Value</option>
         </sdpi-select>
     </sdpi-item>
 
     <sdpi-item label="Volume" style="display:none;">
         <sdpi-range setting="volume-set"
                     showlabels>
-            <span slot="min">-96 dB</span>
-            <span slot="max">0 dB</span>
+            <span slot="min"></span>
+            <span slot="max"></span>
         </sdpi-range>
     </sdpi-item>
 
     <sdpi-item label="Step Size" style="display:none;">
         <sdpi-range setting="volume-adjust"
                     showlabels>
-            <span slot="min">-25 dB</span>
-            <span slot="max">+25 dB</span>
+            <span slot="min"></span>
+            <span slot="max"></span>
         </sdpi-range>
-    </sdpi-item>
-
-    <!-- Blend: -->
-    <sdpi-item label="Action" style="display:none;">
-        <sdpi-select setting="blend-action" placeholder="Please choose an Action">
-            <option value="set">Set Blend</option>
-            <option value="adjust">Adjust Blend</option>
-        </sdpi-select>
     </sdpi-item>
 
     <sdpi-item label="Blend" style="display:none;">
         <sdpi-range setting="blend-set"
                     showlabels>
-            <span slot="min">-1</span>
-            <span slot="max">+1</span>
+            <span slot="min"></span>
+            <span slot="max"></span>
         </sdpi-range>
     </sdpi-item>
 
     <sdpi-item label="Step Size" style="display:none;">
         <sdpi-range setting="blend-adjust"
                     showlabels>
-            <span slot="min">-0.2</span>
-            <span slot="max">+0.2</span>
+            <span slot="min"></span>
+            <span slot="max"></span>
         </sdpi-range>
     </sdpi-item>
 

@@ -5,6 +5,7 @@ using System.ComponentModel;
 using Newtonsoft.Json.Converters;
 using System.Globalization;
 using com.oddbear.testplugin.Actions.Enums;
+using System.Drawing.Drawing2D;
 
 namespace com.oddbear.testplugin.Actions;
 
@@ -21,6 +22,7 @@ public class VolumeEncoder : EncoderBase, IKeypadPlugin
         [JsonProperty(PropertyName = "action")]
         public VolumeActionType Action { get; set; }
 
+        // There are 4 states + output and action:
         [JsonProperty(PropertyName = "volume-set")]
         public int SetVolume { get; set; }
 
@@ -51,6 +53,7 @@ public class VolumeEncoder : EncoderBase, IKeypadPlugin
         else
         {
             _settings = payload.Settings.ToObject<PluginSettings>()!;
+            RefreshState();
         }
 
         _volumeMock.PropertyChanged += VolumeMockOnPropertyChanged;
@@ -69,67 +72,14 @@ public class VolumeEncoder : EncoderBase, IKeypadPlugin
 
     public void KeyPressed(KeyPayload payload)
     {
-        if (_settings.Output == DeviceOut.Blend)
+        switch (_settings.Action)
         {
-            if (_settings.Action == VolumeActionType.Set)
-            {
-                var blend = _settings.SetBlend;
-
-                if (blend < -1)
-                    blend = -1;
-
-                if (blend > 1)
-                    blend = 1;
-
-                SetValue(blend);
-            }
-            else
-            {
-                var blend = GetValue();
-                var adjustmentBlend = _settings.AdjustBlend;
-
-                blend += adjustmentBlend;
-                if (blend < -1)
-                    blend = -1;
-
-                if (blend > 1)
-                    blend = 1;
-
-                SetValue(blend);
-            }
-        }
-        else
-        {
-            if (_settings.Action == VolumeActionType.Set)
-            {
-                var volumeDb = _settings.SetVolume;
-
-                if (volumeDb < -96)
-                    volumeDb = -96;
-
-                if (volumeDb > 0)
-                    volumeDb = 0;
-
-                var volume = LookupTable.OutputDbToPercentage(volumeDb) * 100f;
-                SetValue(volume);
-            }
-            else
-            {
-                var adjustmentDb = _settings.AdjustVolume;
-
-                var oldVolume = GetValue() / 100f;
-                var oldVolumeDb = LookupTable.OutputPercentageToDb(oldVolume);
-
-                var newVolumeDb = oldVolumeDb + adjustmentDb;
-                if (newVolumeDb < -96)
-                    newVolumeDb = -96;
-
-                if (newVolumeDb > 0)
-                    newVolumeDb = 0;
-
-                var newVolume = LookupTable.OutputDbToPercentage(newVolumeDb) * 100f;
-                SetValue(newVolume);
-            }
+            case VolumeActionType.Adjust:
+                Adjust(1);
+                break;
+            case VolumeActionType.Set:
+                Set();
+                break;
         }
 
         // We need to refresh the state with the cached value:
@@ -138,40 +88,86 @@ public class VolumeEncoder : EncoderBase, IKeypadPlugin
 
     public override void DialRotate(DialRotatePayload payload)
     {
-        var ticks = payload.Ticks;
+        Adjust(payload.Ticks);
 
-        if (_settings.Output == DeviceOut.Blend)
+        // We need to refresh the state with the cached value:
+        RefreshState();
+    }
+    
+    private void Adjust(int ticks)
+    {
+        switch (_settings.Output)
         {
-            var steps = _settings.AdjustBlend;
-
-            var oldBlend = GetValue() * 100;
-
-            var newBlend = oldBlend + steps * ticks;
-            if (newBlend < -1)
-                newBlend = -1;
-
-            if (newBlend > 1)
-                newBlend = 1;
-
-            SetValue(newBlend / 100);
+            case DeviceOut.Blend:
+                _volumeMock.MonitorBlend = AdjustBlendCalc(_volumeMock.MonitorBlend, _settings.AdjustBlend, ticks);
+                return;
+            case DeviceOut.Phones:
+                _volumeMock.HeadphonesVolume = AdjustVolumeCalc(_volumeMock.HeadphonesVolume, _settings.AdjustVolume, ticks);
+                return;
+            case DeviceOut.MainOut:
+                _volumeMock.MainOutVolume = AdjustVolumeCalc(_volumeMock.MainOutVolume, _settings.AdjustVolume, ticks);
+                return;
         }
-        else
+    }
+
+    private void Set()
+    {
+        switch (_settings.Output)
         {
-            var steps = _settings.AdjustVolume;
-
-            var oldVolume = GetValue() / 100f;
-            var oldValueDb = LookupTable.OutputPercentageToDb(oldVolume);
-            var newVolumeDb = oldValueDb + steps * ticks;
-
-            if (newVolumeDb < -96)
-                newVolumeDb = -96;
-
-            if (newVolumeDb > 0)
-                newVolumeDb = 0;
-
-            var newVolume = LookupTable.OutputDbToPercentage(newVolumeDb) * 100;
-            SetValue(newVolume);
+            case DeviceOut.Blend:
+                _volumeMock.MonitorBlend = SetBlendCalc(_settings.SetBlend);
+                break;
+            case DeviceOut.Phones:
+                _volumeMock.HeadphonesVolume = SetVolumeCalc(_settings.SetVolume);
+                break;
+            case DeviceOut.MainOut:
+                _volumeMock.MainOutVolume = SetVolumeCalc(_settings.SetVolume);
+                break;
         }
+    }
+
+    private static int SetVolumeCalc(int newVolumeDb)
+    {
+        if (newVolumeDb < -96)
+            newVolumeDb = -96;
+
+        if (newVolumeDb > 0)
+            newVolumeDb = 0;
+
+        var newVolumeRaw = LookupTable.OutputDbToPercentage(newVolumeDb);
+        // TODO: This creates some rounding errors ex. around - 60 dB with only one tick:
+        // TODO: Is rounding errors fixed?
+        // TODO: Still rounding errors around -25.4 dB, think I need to have no integer rounding...
+        return (int)Math.Round(newVolumeRaw * 100);
+    }
+
+    private int AdjustVolumeCalc(int oldVolume, int value, int ticks)
+    {
+        var adjustment = value * ticks;
+
+        var oldVolumeRaw = oldVolume / 100f;
+        var oldVolumeDb = LookupTable.OutputPercentageToDb(oldVolumeRaw);
+        var newVolumeDb = (int)Math.Round(oldVolumeDb + adjustment);
+
+        return SetVolumeCalc(newVolumeDb);
+    }
+
+    private static float SetBlendCalc(float newBlend)
+    {
+        if (newBlend < -1)
+            newBlend = -1;
+
+        if (newBlend > 1)
+            newBlend = 1;
+
+        return newBlend;
+    }
+    private static float AdjustBlendCalc(float oldBlend, float value, int ticks)
+    {
+        var adjustment = value * ticks;
+
+        var newBlend = oldBlend + adjustment;
+        return SetBlendCalc(newBlend);
     }
 
     public override void ReceivedSettings(ReceivedSettingsPayload payload)
@@ -179,16 +175,34 @@ public class VolumeEncoder : EncoderBase, IKeypadPlugin
         // TODO: Might need to set on each update:
         Tools.AutoPopulateSettings(_settings, payload.Settings);
         //Connection.SetSettingsAsync(JObject.FromObject(_settings));
+        RefreshState();
     }
 
     private void RefreshState()
     {
-        if (_settings.Output == DeviceOut.Blend)
+        switch (_settings.Output)
+        {
+            case DeviceOut.Blend:
+                RefreshBlend();
+                return;
+            case DeviceOut.Phones:
+                RefreshVolume(_volumeMock.HeadphonesVolume);
+                return;
+            case DeviceOut.MainOut:
+                RefreshVolume(_volumeMock.MainOutVolume);
+                return;
+        }
+    }
+
+    private void RefreshBlend()
+    {
+        var blend = _volumeMock.MonitorBlend;
+
+        if (_isEncoder)
         {
             float OutputBlendToPercentage(float valueBlend)
                 => (valueBlend + 1) * 50;
 
-            var blend = GetValue();
             var percentage = OutputBlendToPercentage(blend);
 
             Connection.SetFeedbackAsync(new Dictionary<string, string>
@@ -199,12 +213,18 @@ public class VolumeEncoder : EncoderBase, IKeypadPlugin
         }
         else
         {
+            Connection.SetTitleAsync($"{blend:0.00}");
+        }
+    }
+
+    private void RefreshVolume(int percentage)
+    {
+        var volume = LookupTable.OutputPercentageToDb(percentage / 100f);
+        if (_isEncoder)
+        {
             // -96 dB to 0 dB
             //float OutputDbToPercentage(float valueDb)
             //    => (valueDb + 96f) / 96f * 100;
-
-            var percentage = GetValue();
-            var volume = LookupTable.OutputPercentageToDb(percentage / 100f);
 
             Connection.SetFeedbackAsync(new Dictionary<string, string>
             {
@@ -212,35 +232,9 @@ public class VolumeEncoder : EncoderBase, IKeypadPlugin
                 ["indicator"] = percentage.ToString(CultureInfo.InvariantCulture)
             });
         }
-    }
-
-    void SetValue(float value)
-    {
-        switch (_settings.Output)
+        else
         {
-            case DeviceOut.Blend:
-                _volumeMock.MonitorBlend = value;
-                break;
-            case DeviceOut.Phones:
-                _volumeMock.HeadphonesVolume = value;
-                break;
-            case DeviceOut.MainOut:
-                _volumeMock.MainOutVolume = value;
-                break;
-        }
-    }
-
-    float GetValue()
-    {
-        switch (_settings.Output)
-        {
-            case DeviceOut.Blend:
-                return _volumeMock.MonitorBlend;
-            case DeviceOut.Phones:
-                return _volumeMock.HeadphonesVolume;
-            case DeviceOut.MainOut:
-            default:
-                return _volumeMock.MainOutVolume;
+            Connection.SetTitleAsync($"{volume:0.0} dB");
         }
     }
 

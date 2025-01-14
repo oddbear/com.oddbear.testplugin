@@ -43,10 +43,16 @@ function setSdpiSettingEnabled(setting, enable) {
  * @param {string|number} min
  * @param {string|number} max
  * @param {number} step
+ * @param {number} [defaultValue]
  */
-function updateSdpiRange(setting, min, max, step) {
+function updateSdpiRange(setting, min, max, step, defaultValue) {
     const sdpiRange = document.querySelector(`sdpi-range[setting="${setting}"]`);
     if (sdpiRange) {
+
+        // Set a defaultValue as the default, if nothing is already set:
+        if (!sdpiRange.value && typeof defaultValue === 'number') {
+            sdpiRange.value = defaultValue;
+        }
 
         // Update the textContent of the min:
         const minSpan = sdpiRange.querySelector('span[slot="min"]');
@@ -95,13 +101,10 @@ function parseNumber(numString) {
         return numString;
     }
 
-    // Numbers can be like -100, "+100", "-100", "- 100 dB"
-    // Can start with + or -, have whitespaces before number, and then a number:
+    // Numbers can be like -100, "+100", "-100", "- 100 dB", "- 100.00 dB", "+ 100,00 dB"
     const strValue = numString.toString();
-    const pattern = /(\-|\+?)\s*?(\d+)/g;
-
-    const strValueClean = strValue.match(pattern)[0]; // ex. "- 100 dB" -> "- 100"
-    return parseInt(strValueClean);
+    const strValueClean = strValue.replace(/[^0-9\.,\-]/g, '');
+    return parseFloat(strValueClean);
 }
 
 /**
