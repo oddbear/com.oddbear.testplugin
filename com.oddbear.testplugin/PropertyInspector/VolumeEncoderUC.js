@@ -1,4 +1,5 @@
 ﻿/// <reference path="common.js" />
+/// <reference path="SDPIComponents.js" />
 
 document.addEventListener('DOMContentLoaded', async function () {
     const { streamDeckClient } = SDPIComponents;
