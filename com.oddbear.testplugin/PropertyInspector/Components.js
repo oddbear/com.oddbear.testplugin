@@ -1,57 +1,160 @@
 ﻿// Wrapper helper classes:
+
+// Does sdpi-button make any sense? How should we identify it?
+
 class SdpiBase {
     #sdpi_item;
+    #sdpi_component;
+    #titleLabel;
 
-    constructor(sdpi_item) {
-        /** @type {?HTMLElement} */
-        this.#sdpi_item = sdpi_item;
+    constructor(sdpi_component) {
+        /** @type {HTMLElement} */
+        this.#sdpi_component = sdpi_component;
+
+        /** @type {HTMLElement} */
+        this.#sdpi_item = sdpi_component.parentElement;
+
+        /** @type {HTMLLabelElement} */
+        this.#titleLabel = sdpi_component.parentElement.shadowRoot.querySelector('div.label label')
     }
 
-    setVisibility(isVisible) {
-        this.#sdpi_item.style.display = isVisible ? "flex" : "none";
-    }
-}
-
-class SdpiSelect extends SdpiBase {
-    #sdpi_select;
-    #select;
-
-    constructor(sdpi_item, sdpi_select, select) {
-        super(sdpi_item);
-
-        /** @type {?Element} */
-        this.#sdpi_select = sdpi_select;
-
-        /** @type {?HTMLSelectElement} */
-        this.#select = select;
+    /** @returns {string} */
+    get titleLabel() {
+        return this.#titleLabel.textContent;
     }
 
-    /**
-     * @returns {number}
-     */
-    getValue() {
-        return this.#select.value;
+    /** @param {string} titleLabel */
+    set titleLabel(titleLabel) {
+        // this.#sdpi_item.setAttribute('label', label); // No need?
+        this.#titleLabel.textContent = titleLabel;
     }
 
-    setValue(value) {
-        // Triggers settings change event:
-        this.#sdpi_select.value = value;
-        // Just for sync:
-        this.#select.value = value;
+    /** @returns {boolean} */
+    get hidden() {
+        return his.#sdpi_item.style.display == "none";
     }
 
-    /**
-     * @param {boolean} isEnable
-     */
-    setEnabled(isEnable) {
-        this.#select.disabled = !isEnable;
+    /** @param {boolean} hidden */
+    set hidden(hidden) {
+        this.#sdpi_item.style.display = hidden ? "flex" : "none";
     }
 
     /**
      * @param {function() : void} handler
      */
     onChange(handler) {
-        this.#select.addEventListener('change', handler);
+        this.#sdpi_component.addEventListener('valuechange', handler);
+    }
+}
+
+class SdpiCheckbox extends SdpiBase {
+    #sdpi_checkbox;
+    #input_checkbox;
+    #checkboxLabel;
+
+    constructor(sdpi_checkbox) {
+        super(sdpi_checkbox);
+
+        /** @type {Element} */
+        this.#sdpi_checkbox = sdpi_checkbox;
+
+        /** @type {HTMLInputElement} */
+        this.#input_checkbox = sdpi_checkbox.shadowRoot.querySelector('input[type="checkbox"]');
+
+        /** @type {HTMLSpanElement} */
+        this.#checkboxLabel = sdpi_checkbox.shadowRoot.querySelector('span.checkable-text');
+    }
+
+    /** @returns {boolean} */
+    get checked() {
+        return this.#input_checkbox.checked;
+    }
+
+    /** @param {boolean} checked */
+    set checked(checked) {
+        this.#input_checkbox.checked = checked;
+    }
+
+    /** @returns {string} */
+    get label() {
+        return this.#checkboxLabel.textContent;
+    }
+
+    /** @param {string} label */
+    set label(label) {
+        this.#checkboxLabel.textContent = label;
+    }
+
+    /** @returns {boolean} */
+    get disabled() {
+        return this.#input_checkbox.disabled;
+    }
+
+    /** @param {boolean} disabled */
+    set disabled(disabled) {
+        this.#input_checkbox.disabled = disabled;
+    }
+
+    /**
+     * @param {string} setting
+     * @returns {?SdpiCheckbox}
+     */
+    static search(setting) {
+        const sdpi_checkbox = document.querySelector(`sdpi-checkbox[setting="${setting}"]`);
+        return sdpi_checkbox
+            ? new SdpiCheckbox(sdpi_checkbox)
+            : null;
+    }
+}
+class SdpiSelect extends SdpiBase {
+    #sdpi_select;
+    #select;
+
+    constructor(sdpi_select) {
+        super(sdpi_select);
+
+        /** @type {Element} */
+        this.#sdpi_select = sdpi_select;
+
+        /** @type {HTMLSelectElement} */
+        this.#select = sdpi_select.shadowRoot.querySelector('select');
+    }
+
+    // placeholder? This probarbly needs more sinse it's already rendered.
+    // label, this is something else.
+    // Needs some examples on show-refresh, datasource etc.
+
+    /** @returns {boolean|number|string} */
+    get defaultValue() {
+        return this.#sdpi_select.defaultValue;
+    }
+
+    /** @param {boolean|number|string} value */
+    set defaultValue(value) {
+        this.#sdpi_select.defaultValue = value;
+    }
+
+    /** @returns {boolean|number|string} */
+    get value() {
+        return this.#select.value;
+    }
+
+    /** @param {boolean|number|string} value */
+    set value(value) {
+        // Triggers settings change event:
+        this.#sdpi_select.value = value;
+        // Just for sync:
+        this.#select.value = value;
+    }
+
+    /** @returns {boolean} */
+    get disabled() {
+        return this.#select.disabled;
+    }
+
+    /** @param {boolean} disabled */
+    set disabled(disabled) {
+        this.#select.disabled = disabled;
     }
 
     /**
@@ -60,13 +163,9 @@ class SdpiSelect extends SdpiBase {
      */
     static search(setting) {
         const sdpi_select = document.querySelector(`sdpi-select[setting="${setting}"]`);
-        if (!sdpi_select) {
-            return null;
-        }
-
-        const sdpi_item = sdpi_select.parentElement;
-        const select = sdpi_select.shadowRoot.querySelector('select');
-        return new SdpiSelect(sdpi_item, sdpi_select, select);
+        return sdpi_select
+            ? new SdpiSelect(sdpi_select)
+            : null;
     }
 }
 
@@ -74,45 +173,99 @@ class SdpiRange extends SdpiBase {
     #sdpi_range;
     #input_range;
 
-    constructor(sdpi_item, sdpi_range, input_range) {
-        super(sdpi_item);
+    constructor(sdpi_range) {
+        super(sdpi_range);
 
-        /** @type {?Element} */
+        /** @type {Element} */
         this.#sdpi_range = sdpi_range;
 
-        /** @type {?HTMLInputElement} */
-        this.#input_range = input_range;
+        /** @type {HTMLInputElement} */
+        this.#input_range = sdpi_range.shadowRoot.querySelector('input[type="range"]');
     }
 
-    /**
-     * @returns {number}
-     */
-    getValue() {
+    /** @returns {number} */
+    get defaultValue() {
+        return this.#sdpi_range.defaultValue;
+    }
+
+    /** @param {number} value */
+    set defaultValue(value) {
+        this.#sdpi_range.defaultValue = value;
+    }
+
+    /** @returns {number} */
+    get value() {
         return this.#input_range.value;
     }
 
-    /**
-     * @param {number} value
-     */
-    setValue(value) {
+    /** @param {number} value */
+    set value(value) {
+        if (this.min > value) {
+            value = this.min;
+        }
+
+        if (this.max < value) {
+            value = this.max;
+        }
+
         // Triggers settings change event:
         this.#sdpi_range.value = value;
         // Just for sync:
         this.#input_range.value = value;
     }
 
-    /**
-     * @param {boolean} isEnable
-     */
-    setEnabled(isEnable) {
-        this.#input_range.disabled = !isEnable;
+
+    /** @returns {?number} */
+    get min() {
+        return this.#sdpi_range.min;
     }
 
-    /**
-     * @param {function() : void} handler
-     */
-    onChange(handler) {
-        this.#input_range.addEventListener('change', handler);
+    /** @param {number} min */
+    set min(min) {
+        this.#sdpi_range.min = min;
+
+        // Search for the slot element with the min value:
+        const slot = this.#sdpi_range.querySelector('span[slot="min"]');
+        if (slot) {
+            slot.textContent = min;
+        }
+
+        // Update value if min is out of range:
+        if (this.value < min) {
+            this.value = min;
+        }
+    }
+
+
+    /** @returns {?number} */
+    get max() {
+        return this.#sdpi_range.max;
+    }
+
+    /** @param {number} max */
+    set max(max) {
+        this.#sdpi_range.max = max;
+
+        // Search for the slot element with the max value:
+        const slot = this.#sdpi_range.querySelector('span[slot="max"]');
+        if (slot) {
+            slot.textContent = max;
+        }
+
+        // Update value if max is out of range:
+        if (this.value > max) {
+            this.value = max;
+        }
+    }
+
+    /** @returns {boolean} */
+    get disabled() {
+        return this.#input_range.disabled;
+    }
+
+    /** @param {boolean} disabled */
+    set disabled(disabled) {
+        this.#input_range.disabled = disabled;
     }
 
     /**
@@ -121,12 +274,8 @@ class SdpiRange extends SdpiBase {
      */
     static search(setting) {
         const sdpi_range = document.querySelector(`sdpi-range[setting="${setting}"]`);
-        if (!sdpi_range) {
-            return null;
-        }
-
-        const sdpi_item = sdpi_range.parentElement;
-        const input_range = sdpi_range.shadowRoot.querySelector('input[type="range"]');
-        return new SdpiRange(sdpi_item, sdpi_range, input_range);
+        return sdpi_range
+            ? new SdpiRange(sdpi_range)
+            : null;
     }
 }

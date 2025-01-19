@@ -9,12 +9,16 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     const sdpiSelect = SdpiSelect.search("output");
     const sdpiRange = SdpiRange.search("testValue");
+    const sdpiCheckbox = SdpiCheckbox.search("is_okay");
+
+    sdpiCheckbox.onChange(() => {
+        textBoxDiv.textContent = `A: ${sdpiSelect.value}, B: ${sdpiRange.value}, C: ${sdpiCheckbox.checked}`
+    });
+    sdpiRange.defaultValue = 1;
     sdpiSelect.onChange(() => {
-        sdpiRange.setValue(-0.5);
-        textBoxDiv.textContent = `A: ${sdpiSelect.getValue()}, B: ${sdpiRange.getValue()}`
+        textBoxDiv.textContent = `A: ${sdpiSelect.value}, B: ${sdpiRange.value}, C: ${sdpiCheckbox.checked}`
     });
     sdpiRange.onChange(() => {
-        sdpiSelect.setValue("phones");
-        textBoxDiv.textContent = `A: ${sdpiSelect.getValue()}, B: ${sdpiRange.getValue()}`
+        textBoxDiv.textContent = `A: ${sdpiSelect.value}, B: ${sdpiRange.value}, C: ${sdpiCheckbox.checked}`
     });
 });

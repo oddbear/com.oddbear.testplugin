@@ -9,6 +9,16 @@
 <body>
     <div id="testTextBox">temp</div>
 
+    <sdpi-item>
+        <sdpi-button onclick="javascript:alert('Hello World')">
+            Click me
+        </sdpi-button>
+    </sdpi-item>
+
+    <sdpi-item label="Checkbox">
+        <sdpi-checkbox setting="is_okay" label="Is everything okay?"></sdpi-checkbox>
+    </sdpi-item>
+
     <sdpi-item label="Output">
         <sdpi-select setting="output"
                      placeholder="Please choose an Output">
@@ -25,6 +35,8 @@
                     step="0.1"
                     default="0"
                     showlabels>
+            <span slot="min">-1</span>
+            <span slot="max">1</span>
         </sdpi-range>
     </sdpi-item>
 

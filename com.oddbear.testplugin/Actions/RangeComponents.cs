@@ -1,10 +1,8 @@
 ﻿using BarRaider.SdTools;
 using BarRaider.SdTools.Payloads;
 using Newtonsoft.Json;
-using System.ComponentModel;
 using Newtonsoft.Json.Converters;
 using com.oddbear.testplugin.Actions.Enums;
-using Newtonsoft.Json.Linq;
 
 namespace com.oddbear.testplugin.Actions;
 
@@ -20,6 +18,9 @@ public class RangeComponents : EncoderBase, IKeypadPlugin
 
         [JsonProperty(PropertyName = "testValue")]
         public float TestValue { get; set; }
+
+        [JsonProperty(PropertyName = "is_okay")]
+        public bool isOkay { get; set; }
     }
 
     private PluginSettings _settings;
