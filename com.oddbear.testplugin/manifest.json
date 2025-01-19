@@ -86,6 +86,26 @@
         }
       ],
       "UUID": "com.oddbear.testplugin.volume-encoder-uc"
+    },
+    {
+      "Icon": "Images/Icons/category",
+      "Name": "Range Components",
+      "PropertyInspectorPath": "PropertyInspector/RangeComponents.html",
+      "Controllers": [ "Encoder", "Keypad" ],
+      "Encoder": {
+        "layout": "$B1"
+      },
+      "States": [
+        {
+          "Image": "Images/Image",
+          "Title": "Unmuted"
+        },
+        {
+          "Image": "Images/Image",
+          "Title": "Muted"
+        }
+      ],
+      "UUID": "com.oddbear.testplugin.range-components"
     }
   ],
   "Category": "Test Category",
