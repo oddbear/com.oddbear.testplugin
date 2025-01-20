@@ -40,6 +40,9 @@ document.addEventListener('DOMContentLoaded', function () {
             div_tooltip.textContent = `${rangeValue}`;
         }
 
+        // Initial update to ensure correct positioning
+        updateTooltip();
+
         // https://developer.mozilla.org/en-US/docs/Web/API/MutationObserver/observe#using_attributefilter
         // Sdpi uses Lit Components, and the title attribute is automatically added to the input element on change.
         // See '.title' in: https://github.com/GeekyEggo/sdpi-components/blob/bfc3dc6af045b49c1dafc018e85cc1d438918b29/src/components/range.ts
@@ -59,7 +62,7 @@ document.addEventListener('DOMContentLoaded', function () {
         // Start observing the input element for attribute changes
         observer.observe(input_range, { attributeFilter: ["title"] });
 
-        // Initial update to ensure correct positioning
-        updateTooltip();
+        // First we need to remove the attribute, for the observation to trigger when it's added back again.
+        input_range.removeAttribute('title');
     });
 });
