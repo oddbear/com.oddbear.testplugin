@@ -6,19 +6,6 @@ const sdpi_ranges = document.querySelectorAll(`sdpi-range`); // [setting="volume
 document.addEventListener('DOMContentLoaded', function () {
     sdpi_ranges.forEach(sdpi_range => {
         const input_range = sdpi_range.shadowRoot.querySelector('input[type="range"]');
-        //// Does not work, but is triggered, 'title' updated right after this I guess:
-        //sdpi_range.addEventListener('valuechange', ...);
-
-        //input_range.addEventListener('change', function () {
-        //    // Works:
-        //    input_range.removeAttribute('title');
-        //});
-        //setTimeout(function () {
-        //    // Does not work:
-        //    input_range.removeAttribute('title');
-        //}, 5000); // With timeout it does work, so the events is happening after it's created, but before we get here.
-
-        //input_range.removeAttribute('title');
 
         // Show the tooltip on mouseover
         input_range.addEventListener('mouseover', function () {
@@ -35,7 +22,7 @@ document.addEventListener('DOMContentLoaded', function () {
         input_range.addEventListener('input', updateTooltip);
 
         // Function to update the tooltip position and content
-        async function updateTooltip() {
+        function updateTooltip() {
             const rect = input_range.getBoundingClientRect();
             const tooltipWidth = div_tooltip.offsetWidth;
             const rangeWidth = rect.width;
@@ -53,22 +40,15 @@ document.addEventListener('DOMContentLoaded', function () {
             div_tooltip.textContent = `${rangeValue}`;
         }
 
-        // Initial update to ensure correct positioning
-        updateTooltip();
-    });
-});
-
-// https://developer.mozilla.org/en-US/docs/Web/API/MutationObserver/observe#using_attributefilter
-document.addEventListener('DOMContentLoaded', function () {
-    // Sdpi uses Lit Components, and the title attribute is automatically added to the input element on change.
-    // See '.title' in: https://github.com/GeekyEggo/sdpi-components/blob/bfc3dc6af045b49c1dafc018e85cc1d438918b29/src/components/range.ts
-    // The other problem, is that since this is on change, we get several issues:
-    // - We need to remove it initially, but it's added back on 'model binding', without triggering a change event.
-    // - We cannot use the 'valuechange' on the sdpi-range, as the value then is not actually added back again.
-    // - We can use the 'change' event on the input, but we will not be able to remove the first title.
-    // - We can remove the attribute with a setTimeout, so it should be possible to just have a infinite loop that removes it.
-    // All in all, the MutationObserver seems to be the best way.
-    sdpi_ranges.forEach(sdpi_range => {
+        // https://developer.mozilla.org/en-US/docs/Web/API/MutationObserver/observe#using_attributefilter
+        // Sdpi uses Lit Components, and the title attribute is automatically added to the input element on change.
+        // See '.title' in: https://github.com/GeekyEggo/sdpi-components/blob/bfc3dc6af045b49c1dafc018e85cc1d438918b29/src/components/range.ts
+        // The other problem, is that since this is on change, we get several issues:
+        // - We need to remove it initially, but it's added back on 'model binding', without triggering a change event.
+        // - We cannot use the 'valuechange' on the sdpi-range, as the value then is not actually added back again.
+        // - We can use the 'change' event on the input, but we will not be able to remove the first title.
+        // - We can remove the attribute with a setTimeout, so it should be possible to just have a infinite loop that removes it.
+        // All in all, the MutationObserver seems to be the best way.
         const observer = new MutationObserver(mutations => {
             mutations
                 .filter(mutation => mutation.attributeName === 'title')
@@ -77,7 +57,9 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
         // Start observing the input element for attribute changes
-        const input_range = sdpi_range.shadowRoot.querySelector('input[type="range"]');
         observer.observe(input_range, { attributeFilter: ["title"] });
+
+        // Initial update to ensure correct positioning
+        updateTooltip();
     });
 });
