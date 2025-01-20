@@ -106,6 +106,7 @@ class SdpiCheckbox extends SdpiBase {
             : null;
     }
 }
+
 class SdpiSelect extends SdpiBase {
     #sdpi_select;
     #select;
