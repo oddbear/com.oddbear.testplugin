@@ -6,25 +6,31 @@ namespace com.oddbear.testplugin
 {
     public class CacheTimer : IDisposable
     {
-        private float? _value;
+        private readonly Dictionary<string, float> _cache = new();
 
-        public float? GetValue()
+        public float GetValue(string route)
         {
-            if (_timer.Enabled is false)
-                return null;
+            if (_cache.ContainsKey(route) is false)
+                return 0;
 
-            return _value;
+            if (_timer.Enabled is false)
+                return 0;
+
+            return _cache[route];
         }
 
-        public void SetValue(float value)
+        public void SetValue(string route, float value)
         {
             // Reset the timer:
             _timer.Stop();
             _timer.Start();
-            _value = value;
+            _cache[route] = value;
+
+            // Call this when set new value, or cache time has elapsed:
+            _elapsedDelegate();
         }
 
-        public bool Enabled => _timer.Enabled;
+        public bool Active => _timer.Enabled;
 
         private readonly Timer _timer;
         private readonly Action _elapsedDelegate;
@@ -33,7 +39,10 @@ namespace com.oddbear.testplugin
         {
             _elapsedDelegate = elapsedDelegate;
 
-            _timer = new Timer(TimeSpan.FromSeconds(1));
+            _timer = new Timer(TimeSpan.FromSeconds(1))
+            {
+                AutoReset = false
+            };
             _timer.Elapsed += Elapsed;
         }
 
@@ -65,70 +74,64 @@ namespace com.oddbear.testplugin
 
             _volumeEngineMock.PropertyChanged += VolumeEngineMock_PropertyChanged;
 
-            _mainOutVolume = CreateTimer(nameof(MainOutVolume));
-            _headphonesVolume = CreateTimer(nameof(HeadphonesVolume));
-            _monitorBlend = CreateTimer(nameof(MonitorBlend));
+            _cacheTimer = new CacheTimer(NamedPropertyChanged);
         }
+
+        private readonly CacheTimer _cacheTimer;
 
         private void VolumeEngineMock_PropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
+            if (_cacheTimer.Active)
+                return;
+
             switch (e.PropertyName)
             {
-                case nameof(MainOutVolume) when !_mainOutVolume.Enabled:
-                    NamedPropertyChanged(nameof(MainOutVolume));
-                    return;
-                case nameof(HeadphonesVolume) when !_headphonesVolume.Enabled:
-                    NamedPropertyChanged(nameof(HeadphonesVolume));
-                    return;
-                case nameof(MonitorBlend) when !_monitorBlend.Enabled:
-                    NamedPropertyChanged(nameof(MonitorBlend));
+                case nameof(MainOutVolume):
+                case nameof(HeadphonesVolume):
+                case nameof(MonitorBlend):
+                    NamedPropertyChanged();
                     return;
             }
         }
 
-        private CacheTimer CreateTimer(string propertyName)
-        {
-            return new CacheTimer(() => NamedPropertyChanged(propertyName));
-        }
-
-        private void NamedPropertyChanged(string propertyName)
+        private void NamedPropertyChanged()
         {
             // When last item is set, we wait and then set it to the true value:
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(null));
         }
-
-        private readonly CacheTimer _mainOutVolume;
 
         public float MainOutVolume
         {
-            get => GetValue(_mainOutVolume, "MainOut");
-            set => SetValue(_mainOutVolume, "MainOut", value);
+            get => GetValue("MainOut");
+            set => SetValue("MainOut", value);
         }
 
-        private readonly CacheTimer _headphonesVolume;
         public float HeadphonesVolume
         {
-            get => GetValue(_headphonesVolume, "Phones");
-            set => SetValue(_headphonesVolume, "Phones", value);
+            get => GetValue("Phones");
+            set => SetValue("Phones", value);
         }
 
-        private readonly CacheTimer _monitorBlend;
         public float MonitorBlend
         {
-            get => GetValue(_monitorBlend, "Blend");
-            set => SetValue(_monitorBlend, "Blend", value);
+            get => GetValue("Blend");
+            set => SetValue("Blend", value);
         }
 
-        private float GetValue(CacheTimer timer, string route)
+        private float GetValue(string route)
         {
-            return timer.GetValue() ?? _volumeEngineMock.GetValue(route);
+            // If cache is active, return the cached value:
+            return _cacheTimer.Active
+                ? _cacheTimer.GetValue(route)
+                : _volumeEngineMock.GetValue(route);
         }
 
-        private void SetValue(CacheTimer timer, string route, float value)
+        private void SetValue(string route, float value)
         {
-            timer.SetValue(value);
+            // Set value in the cache:
+            _cacheTimer.SetValue(route, value);
+            // Then set the value in the audio interface:
             _volumeEngineMock.SetValue(route, value);
-            NamedPropertyChanged(nameof(MainOutVolume));
         }
 
         // Mock engine
