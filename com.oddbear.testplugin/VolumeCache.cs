@@ -1,69 +1,50 @@
 ﻿using System.ComponentModel;
+using System.Timers;
+using Timer = System.Timers.Timer;
 
 namespace com.oddbear.testplugin
 {
-    public class CacheValue<TValue>
+    public class CacheTimer : IDisposable
     {
-        private TValue _value;
+        private float? _value;
 
-        public TValue GetValue()
+        public float? GetValue()
         {
-            return _timer.Enabled
-                ? _value
-                : _getValue();
+            if (_timer.Enabled is false)
+                return null;
+
+            return _value;
         }
 
-        public void SetValue(TValue value)
+        public void SetValue(float value)
         {
-            // Reset Timer
+            // Reset the timer:
             _timer.Stop();
             _timer.Start();
-
-            // Set cached value:
             _value = value;
-
-            // Set real value (is eventual consistent):
-            _setValue(value);
-
-            // Call callback:
-            _valueUpdatedCallback();
         }
 
-        private readonly string _propertyName;
-        private readonly Action _valueUpdatedCallback;
-        private readonly Func<TValue> _getValue;
-        private readonly Action<TValue> _setValue;
+        public bool Enabled => _timer.Enabled;
 
-        private readonly System.Timers.Timer _timer;
+        private readonly Timer _timer;
+        private readonly Action _elapsedDelegate;
 
-        public CacheValue(string propertyName, Action<string> valueUpdatedCallback, Func<TValue> getValue, Action<TValue> setValue)
+        public CacheTimer(Action elapsedDelegate)
         {
-            _propertyName = propertyName;
-            _valueUpdatedCallback = () => valueUpdatedCallback(propertyName);
-            _getValue = getValue;
-            _setValue = setValue;
+            _elapsedDelegate = elapsedDelegate;
 
-            _timer = new System.Timers.Timer(TimeSpan.FromSeconds(1))
-            {
-                AutoReset = false
-            };
-            _timer.Elapsed += (_, _) => _valueUpdatedCallback();
+            _timer = new Timer(TimeSpan.FromSeconds(1));
+            _timer.Elapsed += Elapsed;
         }
 
-        public void PropertyChanged(object? sender, PropertyChangedEventArgs e)
+        private void Elapsed(object? sender, ElapsedEventArgs e)
         {
-            if (e.PropertyName != _propertyName)
-                return;
-
-            if (_timer.Enabled)
-                return;
-
-            _valueUpdatedCallback();
+            _elapsedDelegate();
         }
 
         public void Dispose()
         {
-            _timer.Stop();
+            _timer.Elapsed -= Elapsed;
             _timer.Dispose();
         }
     }
@@ -82,22 +63,32 @@ namespace com.oddbear.testplugin
             _volumeEngineMock.Mock[nameof(HeadphonesVolume)] = 0.80f;
             _volumeEngineMock.Mock[nameof(MonitorBlend)] = 0.00f;
 
-            _mainOutVolume = Create(nameof(MainOutVolume), "Out");
-            _headphonesVolume = Create(nameof(HeadphonesVolume), "Phones");
-            _monitorBlend = Create(nameof(MonitorBlend), "Blend");
+            _volumeEngineMock.PropertyChanged += VolumeEngineMock_PropertyChanged;
+
+            _mainOutVolume = CreateTimer(nameof(MainOutVolume));
+            _headphonesVolume = CreateTimer(nameof(HeadphonesVolume));
+            _monitorBlend = CreateTimer(nameof(MonitorBlend));
         }
 
-        private CacheValue<float> Create(string propertyName, string route)
+        private void VolumeEngineMock_PropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
-            var cachedValue = new CacheValue<float>(
-                propertyName,
-                NamedPropertyChanged,
-                () => _volumeEngineMock.GetValue(route),
-                value => _volumeEngineMock.SetValue(route, value)
-            );
-            // We need to register the callback delegate:
-            _volumeEngineMock.PropertyChanged += cachedValue.PropertyChanged;
-            return cachedValue;
+            switch (e.PropertyName)
+            {
+                case nameof(MainOutVolume) when !_mainOutVolume.Enabled:
+                    NamedPropertyChanged(nameof(MainOutVolume));
+                    return;
+                case nameof(HeadphonesVolume) when !_headphonesVolume.Enabled:
+                    NamedPropertyChanged(nameof(HeadphonesVolume));
+                    return;
+                case nameof(MonitorBlend) when !_monitorBlend.Enabled:
+                    NamedPropertyChanged(nameof(MonitorBlend));
+                    return;
+            }
+        }
+
+        private CacheTimer CreateTimer(string propertyName)
+        {
+            return new CacheTimer(() => NamedPropertyChanged(propertyName));
         }
 
         private void NamedPropertyChanged(string propertyName)
@@ -106,25 +97,38 @@ namespace com.oddbear.testplugin
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
 
-        private readonly CacheValue<float> _mainOutVolume;
+        private readonly CacheTimer _mainOutVolume;
+
         public float MainOutVolume
         {
-            get => _mainOutVolume.GetValue();
-            set => _mainOutVolume.SetValue(value);
+            get => GetValue(_mainOutVolume, "MainOut");
+            set => SetValue(_mainOutVolume, "MainOut", value);
         }
 
-        private readonly CacheValue<float> _headphonesVolume;
+        private readonly CacheTimer _headphonesVolume;
         public float HeadphonesVolume
         {
-            get => _headphonesVolume.GetValue();
-            set => _headphonesVolume.SetValue(value);
+            get => GetValue(_headphonesVolume, "Phones");
+            set => SetValue(_headphonesVolume, "Phones", value);
         }
 
-        private readonly CacheValue<float> _monitorBlend;
+        private readonly CacheTimer _monitorBlend;
         public float MonitorBlend
         {
-            get => _monitorBlend.GetValue();
-            set => _monitorBlend.SetValue(value);
+            get => GetValue(_monitorBlend, "Blend");
+            set => SetValue(_monitorBlend, "Blend", value);
+        }
+
+        private float GetValue(CacheTimer timer, string route)
+        {
+            return timer.GetValue() ?? _volumeEngineMock.GetValue(route);
+        }
+
+        private void SetValue(CacheTimer timer, string route, float value)
+        {
+            timer.SetValue(value);
+            _volumeEngineMock.SetValue(route, value);
+            NamedPropertyChanged(nameof(MainOutVolume));
         }
 
         // Mock engine
