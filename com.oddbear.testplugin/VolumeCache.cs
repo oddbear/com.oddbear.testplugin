@@ -1,11 +1,133 @@
 ﻿using System.ComponentModel;
-using System.Runtime.Caching;
-using System.Runtime.CompilerServices;
 
 namespace com.oddbear.testplugin
 {
+    public class CacheValue<TValue>
+    {
+        private TValue _value;
+
+        public TValue GetValue()
+        {
+            return _timer.Enabled
+                ? _value
+                : _getValue();
+        }
+
+        public void SetValue(TValue value)
+        {
+            // Reset Timer
+            _timer.Stop();
+            _timer.Start();
+
+            // Set cached value:
+            _value = value;
+
+            // Set real value (is eventual consistent):
+            _setValue(value);
+
+            // Call callback:
+            _valueUpdatedCallback();
+        }
+
+        private readonly string _propertyName;
+        private readonly Action _valueUpdatedCallback;
+        private readonly Func<TValue> _getValue;
+        private readonly Action<TValue> _setValue;
+
+        private readonly System.Timers.Timer _timer;
+
+        public CacheValue(string propertyName, Action<string> valueUpdatedCallback, Func<TValue> getValue, Action<TValue> setValue)
+        {
+            _propertyName = propertyName;
+            _valueUpdatedCallback = () => valueUpdatedCallback(propertyName);
+            _getValue = getValue;
+            _setValue = setValue;
+
+            _timer = new System.Timers.Timer(TimeSpan.FromSeconds(1))
+            {
+                AutoReset = false
+            };
+            _timer.Elapsed += (_, _) => _valueUpdatedCallback();
+        }
+
+        public void PropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName != _propertyName)
+                return;
+
+            if (_timer.Enabled)
+                return;
+
+            _valueUpdatedCallback();
+        }
+
+        public void Dispose()
+        {
+            _timer.Stop();
+            _timer.Dispose();
+        }
+    }
+
     internal class VolumeCache : INotifyPropertyChanged
     {
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        private readonly VolumeEngineMock _volumeEngineMock;
+
+        public VolumeCache()
+        {
+            // Setting starting position in the audio interface:
+            _volumeEngineMock = new();
+            _volumeEngineMock.Mock[nameof(MainOutVolume)] = 0.80f;
+            _volumeEngineMock.Mock[nameof(HeadphonesVolume)] = 0.80f;
+            _volumeEngineMock.Mock[nameof(MonitorBlend)] = 0.00f;
+
+            _mainOutVolume = Create(nameof(MainOutVolume), "Out");
+            _headphonesVolume = Create(nameof(HeadphonesVolume), "Phones");
+            _monitorBlend = Create(nameof(MonitorBlend), "Blend");
+        }
+
+        private CacheValue<float> Create(string propertyName, string route)
+        {
+            var cachedValue = new CacheValue<float>(
+                propertyName,
+                NamedPropertyChanged,
+                () => _volumeEngineMock.GetValue(route),
+                value => _volumeEngineMock.SetValue(route, value)
+            );
+            // We need to register the callback delegate:
+            _volumeEngineMock.PropertyChanged += cachedValue.PropertyChanged;
+            return cachedValue;
+        }
+
+        private void NamedPropertyChanged(string propertyName)
+        {
+            // When last item is set, we wait and then set it to the true value:
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
+        private readonly CacheValue<float> _mainOutVolume;
+        public float MainOutVolume
+        {
+            get => _mainOutVolume.GetValue();
+            set => _mainOutVolume.SetValue(value);
+        }
+
+        private readonly CacheValue<float> _headphonesVolume;
+        public float HeadphonesVolume
+        {
+            get => _headphonesVolume.GetValue();
+            set => _headphonesVolume.SetValue(value);
+        }
+
+        private readonly CacheValue<float> _monitorBlend;
+        public float MonitorBlend
+        {
+            get => _monitorBlend.GetValue();
+            set => _monitorBlend.SetValue(value);
+        }
+
+        // Mock engine
         protected class VolumeEngineMock : INotifyPropertyChanged
         {
             public event PropertyChangedEventHandler? PropertyChanged;
@@ -27,104 +149,6 @@ namespace com.oddbear.testplugin
                 await Task.Delay(200);
                 Mock[route] = value;
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(route));
-            }
-        }
-
-        public event PropertyChangedEventHandler? PropertyChanged;
-
-        private readonly VolumeEngineMock _volumeEngineMock;
-        private readonly MemoryCache _memoryCache;
-        private readonly CacheItemPolicy _policy;
-
-        public VolumeCache()
-        {
-            // Setting starting position in the audio interface:
-            _volumeEngineMock = new();
-            _volumeEngineMock.Mock[nameof(MainOutVolume)] = 0.80f;
-            _volumeEngineMock.Mock[nameof(HeadphonesVolume)] = 0.80f;
-            _volumeEngineMock.Mock[nameof(MonitorBlend)] = 0.00f;
-
-            _volumeEngineMock.PropertyChanged += VolumeEngineMockPropertyChanged;
-
-            _memoryCache = MemoryCache.Default;
-            _policy = new CacheItemPolicy
-            {
-                // When the last temp value is set, we fetch the real value and set it:
-                SlidingExpiration = TimeSpan.FromSeconds(1),
-                RemovedCallback = ExpiredCallback
-            };
-        }
-
-        private void VolumeEngineMockPropertyChanged(object? sender, PropertyChangedEventArgs e)
-        {
-            if (e.PropertyName is null)
-                return;
-
-            var cacheItem = _memoryCache.GetCacheItem(e.PropertyName);
-            if (cacheItem is not null)
-                return; // Should be delayed by the expired event.
-
-            // This is an outside event, and we have not changed anything for a while, so we can set it:
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(e.PropertyName));
-        }
-
-        private void VolumeCachePropertyChanged([CallerMemberName]string propertyName = "")
-        {
-            // This must always be invoked, so all keypads and dials gets updated, and not only the one we are working with:
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
-
-        private void ExpiredCallback(CacheEntryRemovedArguments arguments)
-        {
-            if (arguments.RemovedReason != CacheEntryRemovedReason.Expired)
-                return;
-
-            // When last item is set, we wait and then set it to the true value:
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(arguments.CacheItem.Key));
-        }
-        
-        public float MainOutVolume
-        {
-            get
-            {
-                var tempValue = (float?)_memoryCache.Get(nameof(MainOutVolume));
-                return tempValue ?? _volumeEngineMock.GetValue(nameof(MainOutVolume));
-            }
-            set
-            {
-                _memoryCache.Set(nameof(MainOutVolume), value, _policy);
-                _volumeEngineMock.SetValue(nameof(MainOutVolume), value);
-                VolumeCachePropertyChanged();
-            }
-        }
-
-        public float HeadphonesVolume
-        {
-            get
-            {
-                var tempValue = (float?)_memoryCache.Get(nameof(HeadphonesVolume));
-                return tempValue ?? _volumeEngineMock.GetValue(nameof(HeadphonesVolume));
-            }
-            set
-            {
-                _memoryCache.Set(nameof(HeadphonesVolume), value, _policy);
-                _volumeEngineMock.SetValue(nameof(HeadphonesVolume), value);
-                VolumeCachePropertyChanged();
-            }
-        }
-
-        public float MonitorBlend
-        {
-            get
-            {
-                var tempValue = (float?)_memoryCache.Get(nameof(MonitorBlend));
-                return tempValue ?? _volumeEngineMock.GetValue(nameof(MonitorBlend));
-            }
-            set
-            {
-                _memoryCache.Set(nameof(MonitorBlend), value, _policy);
-                _volumeEngineMock.SetValue(nameof(MonitorBlend), value);
-                VolumeCachePropertyChanged();
             }
         }
     }
